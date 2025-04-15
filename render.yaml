@@ -11,6 +11,7 @@ services:
   - type: web
     name: foxfuel-frontend
     env: static
+    plan: free
     rootDir: client
     buildCommand: npm install && npm run build
     staticPublishPath: dist
