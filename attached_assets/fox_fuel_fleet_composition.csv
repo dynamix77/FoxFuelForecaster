@@ -1,0 +1,10 @@
+Vehicle Type,Vehicle ID,VIN #,Description,License Plate,Capacity (Gallons),Compartments,# of Axles,Primary Use,Special Features,Scheduled Replacement,Estimated Replacement Cost
+Straight Truck,117,1HTWGAZT4AJ272705,2010 International Tank Truck,AF73262,4400,3,3,Residential heating oil deliveries,"Meter system, maneuverability",Q3 2025 (Chassis Replacement),"$68,000 "
+Straight Truck,118,2NKHLJ9X7KM293190,2019 Kenworth T370 Tank Truck **,AG91171,4400,3,3,Residential & light commercial fuel deliveries,"Improved fuel efficiency, advanced cab comfort",N/A,N/A
+Straight Truck,119,2NK5LJ0X8RM379957,2024 Kenworth T480 Tank Truck,AH58678,4400,3,3,Residential & small commercial operations,"Safety features, collision avoidance system",Condition assessment in Q4 2026,"TBD ($175,000 budgeted)"
+Double-Axle Tractor,1108,1FUJA6CV57LX09780,2007 Freightliner Tractor,AE68485,Paired with trailers,N/A,5,Bulk commercial fuel deliveries,Pumping system for above-ground tank deliveries,Q1 2026,"$195,000 "
+Double-Axle Tractor,1110,1XKZDK9X0PJ258678,2023 Kenworth ,AH29794,Paired with trailers,N/A,3,Bulk commercial fuel deliveries,"Pumping system, paired with mini/full-size trailers",N/A,N/A
+Double-Axle Tractor,1112,1FUBGADV2FLFW4123,2015 Freightliner Cascadia 113 S/A Tractor,AH36837,Paired with trailers,N/A,2,Bulk commercial fuel deliveries,Similar to vehicles 1108 and 1110,Q2-Q3 2025 (Tri-axle upgrade with T102),"$210,000 (combined with T102)"
+Mini Trailer,T102,1A9SSTO24MC002686,1991 Allied Trailer,XM87963,6400,3,N/A,Medium-sized deliveries with maneuverability,"Enhanced maneuverability, flexible load capacity",Q2-Q3 2025 (Tri-axle upgrade with 1112),"$210,000 (combined with 1112)"
+Full-Size Trailer,T105,4J8TO43201003909,2001 Fruehauf Trailer **,T36P3J,9200,5,N/A,Bulk deliveries to industrial & transportation hubs,Multiple compartments for various fuel types,Q2 2025,"$85,000 "
+Full-Size Trailer,T106,1PMA24420X5001661,1999 Polar Trailer **,TEF26B,9200,4,N/A,Bulk deliveries to industrial & transportation hubs,Multiple compartments for various fuel types,Condition assessment in Q4 2027,"$85,000 "

@@ -2,15 +2,25 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Vehicle, AppSettings, Alert, Projection, FundPoint, CapExPoint, Scenario, SimulationParams, SimulationResults, TaxAnalysis } from './types';
 import { defaultVehicles, defaultSettings, defaultScenarios, defaultSimulationParams } from './defaultData';
 import { calculateProjections, calculateAgeDistribution, calculateTaxBenefits, calculateSimulation } from './calculations';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from './queryClient';
 
 interface AppContextValue {
   // State
   vehicles: Vehicle[];
+  vehiclesLoading: boolean;
+  vehiclesError: Error | null;
   settings: AppSettings;
+  settingsLoading: boolean;
+  settingsError: Error | null;
   activeTab: string;
   scenarios: Scenario[];
+  scenariosLoading: boolean;
+  scenariosError: Error | null;
   activeScenario: string;
   simulationParams: SimulationParams;
+  simulationParamsLoading: boolean;
+  simulationParamsError: Error | null;
   taxMethod: string;
 
   // Computed values
@@ -45,14 +55,181 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  
   // Core state
-  const [vehicles, setVehicles] = useState<Vehicle[]>(defaultVehicles);
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [scenarios] = useState<Scenario[]>(defaultScenarios);
   const [activeScenario, setActiveScenario] = useState('current');
-  const [simulationParams, setSimulationParams] = useState(defaultSimulationParams);
   const [taxMethod, setTaxMethod] = useState('immediate');
+
+  // Fetch vehicles from the API
+  const {
+    data: vehicles = [],
+    isLoading: vehiclesLoading,
+    error: vehiclesError
+  } = useQuery({
+    queryKey: ['/api/vehicles'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('/api/vehicles');
+        if (!response.ok) throw new Error('Failed to fetch vehicles');
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching vehicles:', error);
+        // Fall back to default vehicles if API fails
+        return defaultVehicles;
+      }
+    }
+  });
+
+  // Initialize settings state with default values
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState<Error | null>(null);
+
+  // Fetch settings from the API
+  useEffect(() => {
+    async function fetchSettings() {
+      setSettingsLoading(true);
+      try {
+        // Fetch financial settings
+        const financialResponse = await fetch('/api/settings/financial');
+        let financial = defaultSettings.financial;
+        if (financialResponse.ok) {
+          financial = await financialResponse.json();
+        }
+
+        // Fetch alert settings
+        const alertsResponse = await fetch('/api/settings/alerts');
+        let alerts = defaultSettings.alerts;
+        if (alertsResponse.ok) {
+          alerts = await alertsResponse.json();
+        }
+
+        // Fetch system settings
+        const systemResponse = await fetch('/api/settings/system');
+        let system = defaultSettings.system;
+        if (systemResponse.ok) {
+          system = await systemResponse.json();
+        }
+
+        setSettings({
+          financial,
+          alerts,
+          system
+        });
+        setSettingsError(null);
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+        setSettingsError(error instanceof Error ? error : new Error('Failed to fetch settings'));
+        // Keep default settings if API fails
+      } finally {
+        setSettingsLoading(false);
+      }
+    }
+
+    fetchSettings();
+  }, []);
+
+  // Fetch scenarios from the API
+  const {
+    data: scenarios = defaultScenarios,
+    isLoading: scenariosLoading,
+    error: scenariosError
+  } = useQuery({
+    queryKey: ['/api/scenarios'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('/api/scenarios');
+        if (!response.ok) throw new Error('Failed to fetch scenarios');
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching scenarios:', error);
+        // Fall back to default scenarios if API fails
+        return defaultScenarios;
+      }
+    }
+  });
+
+  // Fetch simulation parameters from the API
+  const {
+    data: apiSimulationParams,
+    isLoading: simulationParamsLoading,
+    error: simulationParamsError
+  } = useQuery({
+    queryKey: ['/api/simulation/params'],
+    queryFn: async () => {
+      try {
+        const response = await fetch('/api/simulation/params');
+        if (!response.ok) throw new Error('Failed to fetch simulation parameters');
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching simulation parameters:', error);
+        // Fall back to default parameters if API fails
+        return null;
+      }
+    }
+  });
+
+  // Use API simulation params or fall back to defaults
+  const simulationParams = apiSimulationParams || defaultSimulationParams;
+
+  // Mutations for CRUD operations
+  const addVehicleMutation = useMutation({
+    mutationFn: (vehicle: Omit<Vehicle, 'id'>) => 
+      apiRequest('POST', '/api/vehicles', vehicle),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vehicles'] });
+    }
+  });
+
+  const updateVehicleMutation = useMutation({
+    mutationFn: (vehicle: Vehicle) => 
+      apiRequest('PUT', `/api/vehicles/${vehicle.id}`, vehicle),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vehicles'] });
+    }
+  });
+
+  const removeVehicleMutation = useMutation({
+    mutationFn: (id: number) => 
+      apiRequest('DELETE', `/api/vehicles/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vehicles'] });
+    }
+  });
+
+  const updateFinancialSettingsMutation = useMutation({
+    mutationFn: (updatedSettings: Partial<AppSettings['financial']>) => 
+      apiRequest('POST', '/api/settings/financial', updatedSettings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/financial'] });
+    }
+  });
+
+  const updateAlertSettingsMutation = useMutation({
+    mutationFn: (updatedSettings: Partial<AppSettings['alerts']>) => 
+      apiRequest('POST', '/api/settings/alerts', updatedSettings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/alerts'] });
+    }
+  });
+
+  const updateSystemSettingsMutation = useMutation({
+    mutationFn: (updatedSettings: Partial<AppSettings['system']>) => 
+      apiRequest('POST', '/api/settings/system', updatedSettings),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/system'] });
+    }
+  });
+
+  const updateSimulationParamsMutation = useMutation({
+    mutationFn: (params: Partial<SimulationParams>) => 
+      apiRequest('POST', '/api/simulation/params', params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/simulation/params'] });
+    }
+  });
 
   // Compute projections whenever vehicles or settings change
   const { projections, fundPoints, capExPoints } = calculateProjections(
@@ -133,24 +310,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Add a vehicle with a new ID
   const addVehicle = (vehicleData: Omit<Vehicle, 'id'>) => {
-    const newId = Math.max(0, ...vehicles.map(v => v.id)) + 1;
-    setVehicles([...vehicles, { ...vehicleData, id: newId }]);
+    addVehicleMutation.mutate(vehicleData);
   };
 
   // Update an existing vehicle
   const updateVehicle = (updatedVehicle: Vehicle) => {
-    setVehicles(vehicles.map(v => 
-      v.id === updatedVehicle.id ? updatedVehicle : v
-    ));
+    updateVehicleMutation.mutate(updatedVehicle);
   };
 
   // Remove a vehicle by ID
   const removeVehicle = (id: number) => {
-    setVehicles(vehicles.filter(v => v.id !== id));
+    removeVehicleMutation.mutate(id);
   };
 
   // Update financial settings
   const updateFinancialSettings = (updatedSettings: Partial<AppSettings['financial']>) => {
+    // Update local state immediately for responsive UI
     setSettings({
       ...settings,
       financial: {
@@ -158,10 +333,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...updatedSettings
       }
     });
+    
+    // Then update in the database
+    updateFinancialSettingsMutation.mutate({
+      ...settings.financial,
+      ...updatedSettings
+    });
   };
 
   // Update alert settings
   const updateAlertSettings = (updatedSettings: Partial<AppSettings['alerts']>) => {
+    // Update local state immediately for responsive UI
     setSettings({
       ...settings,
       alerts: {
@@ -169,10 +351,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...updatedSettings
       }
     });
+    
+    // Then update in the database
+    updateAlertSettingsMutation.mutate({
+      ...settings.alerts,
+      ...updatedSettings
+    });
   };
 
   // Update system settings
   const updateSystemSettings = (updatedSettings: Partial<AppSettings['system']>) => {
+    // Update local state immediately for responsive UI
     setSettings({
       ...settings,
       system: {
@@ -180,19 +369,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...updatedSettings
       }
     });
-  };
-
-  // Update all settings at once
-  const updateSettings = (updatedSettings: Partial<AppSettings>) => {
-    setSettings({
-      ...settings,
+    
+    // Then update in the database
+    updateSystemSettingsMutation.mutate({
+      ...settings.system,
       ...updatedSettings
     });
   };
 
+  // Update all settings at once
+  const updateSettings = (updatedSettings: Partial<AppSettings>) => {
+    // Update local state immediately for responsive UI
+    setSettings({
+      ...settings,
+      ...updatedSettings
+    });
+    
+    // Then update individual settings in the database
+    if (updatedSettings.financial) {
+      updateFinancialSettingsMutation.mutate({
+        ...settings.financial,
+        ...updatedSettings.financial
+      });
+    }
+    
+    if (updatedSettings.alerts) {
+      updateAlertSettingsMutation.mutate({
+        ...settings.alerts,
+        ...updatedSettings.alerts
+      });
+    }
+    
+    if (updatedSettings.system) {
+      updateSystemSettingsMutation.mutate({
+        ...settings.system,
+        ...updatedSettings.system
+      });
+    }
+  };
+
   // Update simulation parameters
   const updateSimulationParams = (params: Partial<SimulationParams>) => {
-    setSimulationParams({
+    // Update the simulation parameters in the database
+    updateSimulationParamsMutation.mutate({
       ...simulationParams,
       ...params
     });
@@ -200,11 +419,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: AppContextValue = {
     vehicles,
+    vehiclesLoading,
+    vehiclesError,
     settings,
+    settingsLoading,
+    settingsError,
     activeTab,
     scenarios,
+    scenariosLoading,
+    scenariosError,
     activeScenario,
     simulationParams,
+    simulationParamsLoading,
+    simulationParamsError,
     taxMethod,
     projections,
     fundPoints,
