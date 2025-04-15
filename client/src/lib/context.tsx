@@ -319,6 +319,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateVehicleMutation.mutate(updatedVehicle);
   };
 
+  // Update vehicle pricing information
+  const updateVehiclePricing = async (
+    vehicleId: number, 
+    currentValue: number, 
+    replacementCost: number,
+    salvageValue: number
+  ): Promise<boolean> => {
+    try {
+      const data = {
+        currentValue,
+        replacementCost,
+        salvageValue
+      };
+      
+      await apiRequest('PUT', `/api/vehicles/${vehicleId}`, data);
+      
+      // Invalidate vehicle queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/vehicles'] });
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating vehicle pricing:', error);
+      return false;
+    }
+  };
+
   // Remove a vehicle by ID
   const removeVehicle = (id: number) => {
     removeVehicleMutation.mutate(id);
@@ -445,6 +471,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setActiveTab,
     addVehicle,
     updateVehicle,
+    updateVehiclePricing,
     removeVehicle,
     updateFinancialSettings,
     updateAlertSettings,

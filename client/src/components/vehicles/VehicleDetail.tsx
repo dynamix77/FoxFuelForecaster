@@ -31,7 +31,7 @@ interface VehicleDetailProps {
 export function VehicleDetail({ vehicle, isOpen, onClose }: VehicleDetailProps) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { removeVehicle, settings } = useAppContext();
+  const { removeVehicle, settings, updateVehiclePricing } = useAppContext();
   const [confirmDelete, setConfirmDelete] = useState(false);
   
   const currentYear = new Date().getFullYear();
@@ -85,26 +85,35 @@ export function VehicleDetail({ vehicle, isOpen, onClose }: VehicleDetailProps) 
   };
   
   // Handler for updating vehicle pricing from the pricing panel
-  const handleUpdatePricing = (
+  const handleUpdatePricing = async (
     vehicleId: number, 
     currentValue: number, 
     replacementCost: number,
     salvageValue: number
   ) => {
-    const updatedVehicle = {
-      ...vehicle,
-      replacementCost,
-      salvageValue
-    };
-    
-    // Here we would typically use the updateVehicle function from context,
-    // but we're just logging for now since we haven't added that feature yet
-    console.log("Updating vehicle with new pricing:", updatedVehicle);
-    
-    toast({
-      title: "Pricing Updated",
-      description: `Updated replacement cost to $${replacementCost.toLocaleString()} and salvage value to $${salvageValue.toLocaleString()}`,
-    });
+    try {
+      const success = await updateVehiclePricing(vehicleId, currentValue, replacementCost, salvageValue);
+      
+      if (success) {
+        toast({
+          title: "Pricing Updated",
+          description: `Updated replacement cost to $${replacementCost.toLocaleString()} and salvage value to $${salvageValue.toLocaleString()}`,
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: "There was an error updating the vehicle pricing. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating vehicle pricing:", error);
+      toast({
+        title: "Update Failed",
+        description: "There was an error updating the vehicle pricing. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
