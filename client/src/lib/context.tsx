@@ -42,6 +42,7 @@ interface AppContextValue {
   setActiveTab: (tab: string) => void;
   addVehicle: (vehicle: Omit<Vehicle, 'id'>) => void;
   updateVehicle: (vehicle: Vehicle) => void;
+  updateVehiclePricing: (vehicleId: number, currentValue: number, replacementCost: number, salvageValue: number) => Promise<boolean>;
   removeVehicle: (id: number) => void;
   updateFinancialSettings: (settings: Partial<AppSettings['financial']>) => void;
   updateAlertSettings: (settings: Partial<AppSettings['alerts']>) => void;
