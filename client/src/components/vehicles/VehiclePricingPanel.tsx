@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { getVehiclePricing, VehiclePricingData, getMarketTrends } from '@/lib/vehiclePricingService';
+import { runVehiclePricing } from '@/lib/vehiclePricingService';
 import { RefreshCw, TrendingUp, TrendingDown, DollarSign, AlertCircle, Check, Truck } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -35,24 +35,35 @@ export function VehiclePricingPanel({ vehicle, onUpdatePricing }: VehiclePricing
   const { toast } = useToast();
   
   const fetchPricingData = async () => {
-    setLoading(true);
-    try {
-      const data = await getVehiclePricing(vehicle);
-      setPricingData(data);
-      
-      const trends = await getMarketTrends(vehicle.type);
-      setMarketTrends(trends);
-    } catch (error) {
-      console.error("Error fetching vehicle pricing:", error);
-      toast({
-        title: "Error retrieving pricing data",
-        description: "Unable to fetch current market values. Please try again later.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const input = {
+      vehicle,
+      inflationRate: 0.03,
+      investmentRate: 0.06,
+      taxRate: 0.25,
+      years: 5
+    };
+
+    const data = await runVehiclePricing(input);
+    setPricingData(data);
+
+    // Optionally skip trends for now
+    // const trends = await getMarketTrends(vehicle.type);
+    // setMarketTrends(trends);
+
+  } catch (error) {
+    console.error("Error fetching vehicle pricing:", error);
+    toast({
+      title: "Error retrieving pricing data",
+      description: "Unable to fetch current market values. Please try again later.",
+      variant: "destructive"
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
   
   useEffect(() => {
     // Load pricing data when component mounts
