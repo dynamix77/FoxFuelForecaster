@@ -1,0 +1,1545 @@
+        
+        // Calculate financial projections
+        function calculateProjections() {
+            const vehicles = appData.vehicles;
+            const settings = appData.settings.financial;
+            const projections = [];
+            
+            // Sort vehicles by replacement year and quarter
+            const sortedVehicles = [...vehicles].sort((a, b) => {
+                if (a.replacementYear !== b.replacementYear) {
+                    return a.replacementYear - b.replacementYear;
+                }
+                
+                // Sort by quarter if years are the same
+                const quarterMap = { 'Q1': 1, 'Q2': 2, 'Q3': 3, 'Q4': 4 };
+                return quarterMap[a.replacementQuarter] - quarterMap[b.replacementQuarter];
+            });
+            
+            // Initialize fund
+            let currentFund = settings.initialFund;
+            let fundPoints = [];
+            
+            // Calculate for 10 years (120 months)
+            for (let month = 1; month <= 120; month++) {
+                // Add monthly contribution
+                currentFund += settings.monthlyContribution;
+                
+                // Add interest (monthly)
+                currentFund += currentFund * (settings.interestRate / 100 / 12);
+                
+                // Check if any vehicles need replacement this month
+                sortedVehicles.forEach(vehicle => {
+                    // Convert year and quarter to month
+                    const quarterMap = { 'Q1': 1, 'Q2': 4, 'Q3': 7, 'Q4': 10 };
+                    const replacementMonth = ((vehicle.replacementYear - 2025) * 12) + quarterMap[vehicle.replacementQuarter];
+                    
+                    if (month === replacementMonth) {
+                        // Calculate inflation-adjusted cost
+                        const years = (vehicle.replacementYear - 2025) + (quarterMap[vehicle.replacementQuarter] / 12);
+                        const inflatedCost = vehicle.replacementCost * Math.pow(1 + (vehicle.inflationRate / 100), years);
+                        
+                        // Calculate net cost after salvage value
+                        const netCost = inflatedCost - vehicle.salvageValue;
+                        
+                        // Calculate monthly reserve needed
+                        const monthsUntilReplacement = replacementMonth;
+                        const monthlyReserve = monthsUntilReplacement > 0 ? Math.round(netCost / monthsUntilReplacement) : 0;
+                        
+                        // Calculate potential loan payment
+                        const loanPayment = calculatePayment(
+                            netCost, 
+                            settings.loanInterestRate / 100 / 12, 
+                            settings.loanTermYears * 12
+                        );
+                        
+                        // Calculate lease payment
+                        const leasePayment = calculateLeasePayment(
+                            inflatedCost,
+                            vehicle.salvageValue,
+                            settings.leaseInterestRate,
+                            settings.loanTermYears
+                        );
+                        
+                        // Add to projections
+                        projections.push({
+                            ...vehicle,
+                            adjustedCost: Math.round(inflatedCost),
+                            netCost: Math.round(netCost),
+                            fundBeforePurchase: Math.round(currentFund),
+                            fundAfterPurchase: Math.round(currentFund - netCost),
+                            shortfall: currentFund < netCost ? Math.round(netCost - currentFund) : 0,
+                            monthlyReserve: Math.round(monthlyReserve),
+                            loanPayment: Math.round(loanPayment),
+                            leasePayment: Math.round(leasePayment),
+                            replacementMonth: month
+                        });
+                        
+                        // Deduct from fund if possible
+                        if (currentFund >= netCost) {
+                            currentFund -= netCost;
+                        } else {
+                            // Not enough funds - indicates a shortfall
+                            currentFund = 0;
+                        }
+                    }
+                });
+                
+                // Every 3 months (quarterly), add to chart data
+                if (month % 3 === 0) {
+                    fundPoints.push({
+                        quarter: Math.ceil(month / 3),
+                        fundBalance: Math.round(currentFund)
+                    });
+                }
+            }
+            
+            return { projections, fundPoints };
+        }
+        
+        // Update Projections Table
+        function updateProjectionsTable() {
+            const tableBody = document.getElementById('projections-table');
+            tableBody.innerHTML = '';
+            
+            const { projections } = calculateProjections();
+            
+            if (projections.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; font-style: italic; color: var(--gray);">No replacements scheduled</td></tr>`;
+                return;
+            }
+            
+            projections.forEach(item => {
+                const row = document.createElement('tr');
+                row.className = item.shortfall > 0 ? 'bg-red-50' : '';
+                
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.replacementQuarter} ${item.replacementYear}</td>
+                    <td>${formatCurrency(item.netCost)}</td>
+                    <td>${formatCurrency(item.monthlyReserve)}</td>
+                    <td>${formatCurrency(item.loanPayment)}</td>
+                    <td>${formatCurrency(item.leasePayment)}</td>
+                    <td>
+                        ${item.shortfall > 0 ? 
+                            `<span class="text-red font-medium">Shortfall: ${formatCurrency(item.shortfall)}</span>` : 
+                            `<span class="text-green">Funded</span>`
+                        }
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // Calculate quarterly capital expenditures
+        function calculateQuarterlyCapex() {
+            const vehicles = appData.vehicles;
+            const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+            const yearQuarterGroups = {};
+            
+            vehicles.forEach(vehicle => {
+                const key = `${vehicle.replacementYear}-${vehicle.replacementQuarter}`;
+                if (!yearQuarterGroups[key]) {
+                    yearQuarterGroups[key] = 0;
+                }
+                yearQuarterGroups[key] += vehicle.replacementCost - vehicle.salvageValue;
+            });
+            
+            //                                <td>12.1%</td>
+                                <td>
+                                    <div class="flex items-center">
+                                        <div class="progress-bar">
+                                            <div class="progress-value" style="width: 70%; background-color: #ef4444;"></div>
+                                        </div>
+                                        <span>70</span>
+                                    </div>
+                                </td>
+                                <td><button class="select-scenario" data-scenario="delay">Select</button></td>
+                            </tr>
+                            <tr class="scenario-row" data-scenario="lease">
+                                <td>Lease Options</td>
+                                <td>$243,000</td>
+                                <td>12.3%</td>
+                                <td>
+                                    <div class="flex items-center">
+                                        <div class="progress-bar">
+                                            <div class="progress-value" style="width: 41%; background-color: #10b981;"></div>
+                                        </div>
+                                        <span>41</span>
+                                    </div>
+                                </td>
+                                <td><button class="select-scenario" data-scenario="lease">Select</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Active Scenario Details -->
+            <div class="card">
+                <h2 id="scenario-title">Current Plan Details</h2>
+                
+                <div class="grid grid-cols-2">
+                    <!-- Left side - summary -->
+                    <div>
+                        <h3>Summary</h3>
+                        
+                        <div id="current-plan-summary" class="scenario-summary active">
+                            <div class="space-y-4">
+                                <p class="text-sm">
+                                    This scenario follows your current replacement schedule with all vehicles being replaced 
+                                    according to their planned dates. It represents the baseline against which other scenarios 
+                                    are compared.
+                                </p>
+                                
+                                <div class="alert alert-info">
+                                    <h4>Key Points</h4>
+                                    <ul class="list-disc">
+                                        <li>All replacements happen on schedule</li>
+                                        <li>Requires $300,500 in total</li>
+                                        <li>ROI of 15.4% based on operational savings</li>
+                                        <li>Risk score: 58/100</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="delay-plan-summary" class="scenario-summary">
+                            <div class="space-y-4">
+                                <p class="text-sm">
+                                    This scenario pushes all planned replacements back by one year. While this reduces 
+                                    immediate capital requirements, it may increase maintenance costs and operational risk.
+                                </p>
+                                
+                                <div class="alert alert-warning">
+                                    <h4>Key Points</h4>
+                                    <ul class="list-disc">
+                                        <li>All replacements delayed by 12 months</li>
+                                        <li>Higher maintenance costs expected in interim</li>
+                                        <li>Increased inflation impact on replacement costs</li>
+                                        <li>Higher operational risk due to aging equipment</li>
+                                        <li>Additional cash flow flexibility in short term</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="lease-plan-summary" class="scenario-summary">
+                            <div class="space-y-4">
+                                <p class="text-sm">
+                                    This scenario evaluates leasing equipment instead of purchasing. Leasing reduces upfront 
+                                    capital requirements but has different tax implications and ownership considerations.
+                                </p>
+                                
+                                <div class="alert alert-success">
+                                    <h4>Key Points</h4>
+                                    <ul class="list-disc">
+                                        <li>TRAC leases with purchase options at end of term</li>
+                                        <li>Lower monthly cash flow impact</li>
+                                        <li>Lease payments fully tax deductible as operating expenses</li>
+                                        <li>Reduced maintenance risk with newer equipment</li>
+                                        <li>No large capital expenditures required</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right side - financial impact -->
+                    <div>
+                        <h3>Financial Impact</h3>
+                        
+                        <div class="space-y-4">
+                            <!-- Cash Flow Impact -->
+                            <div>
+                                <h4>Yearly Cash Flow Impact</h4>
+                                <div class="alert alert-info">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm">Year 1 (2025):</span>
+                                            <span class="text-sm font-medium scenario-cashflow-y1">$300,500</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm">Year 2 (2026):</span>
+                                            <span class="text-sm font-medium scenario-cashflow-y2">$0</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm">Year 3 (2027):</span>
+                                            <span class="text-sm font-medium scenario-cashflow-y3">$0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Tax Impact -->
+                            <div>
+                                <h4>Tax Impact</h4>
+                                <div class="alert alert-info">
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm">Year 1 Tax Savings:</span>
+                                            <span class="text-sm font-medium scenario-tax-y1">$84,140</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm">Total 5-Year Tax Savings:</span>
+                                            <span class="text-sm font-medium scenario-tax-5y">$84,140</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Financial Recommendation -->
+                            <div class="alert alert-warning">
+                                <h4>Recommendation</h4>
+                                <p class="text-sm scenario-recommendation">
+                                    The current plan offers balanced financial impact with immediate tax benefits from Section 179 deductions, though it requires significant upfront capital. Consider using bank financing with the Section 179 deduction for optimal short-term cash flow benefits.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- What-If Simulator -->
+            <div class="card">
+                <h2>What-If Simulator</h2>
+                
+                <div class="text-sm mb-4">
+                    <p>Use these sliders to simulate different financial conditions and see how they affect your fleet replacement strategy.</p>
+                </div>
+                
+                <div class="grid grid-cols-2">
+                    <!-- First column -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="sim-contribution">Monthly Equipment Fund Contribution</label>
+                            <input type="range" id="sim-contribution" min="1000" max="10000" step="500" value="3000">
+                            <div class="range-labels">
+                                <span>$1,000</span>
+                                <span id="contribution-value">$3,000</span>
+                                <span>$10,000</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="sim-interest">Interest Rate Environment</label>
+                            <input type="range" id="sim-interest" min="3" max="12" step="0.5" value="6.5">
+                            <div class="range-labels">
+                                <span>3% (Low)</span>
+                                <span id="interest-value">6.5%</span>
+                                <span>12% (High)</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="sim-inflation">Equipment Cost Inflation</label>
+                            <input type="range" id="sim-inflation" min="1" max="8" step="0.5" value="2.5">
+                            <div class="range-labels">
+                                <span>1% (Low)</span>
+                                <span id="inflation-value">2.5%</span>
+                                <span>8% (High)</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Second column -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="sim-tax">Effective Tax Rate</label>
+                            <input type="range" id="sim-tax" min="15" max="40" step="1" value="28">
+                            <div class="range-labels">
+                                <span>15%</span>
+                                <span id="tax-value">28%</span>
+                                <span>40%</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="sim-maintenance">Maintenance Cost Trend</label>
+                            <input type="range" id="sim-maintenance" min="-20" max="50" step="5" value="0">
+                            <div class="range-labels">
+                                <span>-20% (Decreasing)</span>
+                                <span id="maintenance-value">No Change</span>
+                                <span>+50% (Increasing)</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="sim-term">Financing Term Length</label>
+                            <input type="range" id="sim-term" min="3" max="7" step="1" value="5">
+                            <div class="range-labels">
+                                <span>3 Years</span>
+                                <span id="term-value">5 Years</span>
+                                <span>7 Years</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Simulation Results -->
+                <div class="mt-4 alert alert-info">
+                    <h3>Simulation Results</h3>
+                    
+                    <div class="grid grid-cols-3 mt-2">
+                        <div class="bg-white p-2 rounded">
+                            <div class="text-sm">Monthly Cash Required</div>
+                            <div class="text-lg font-medium" id="sim-monthly-cash">$5,400</div>
+                        </div>
+                        
+                        <div class="bg-white p-2 rounded">
+                            <div class="text-sm">Fund Balance After 5 Years</div>
+                            <div class="text-lg font-medium" id="sim-fund-balance">-$122,500</div>
+                        </div>
+                        
+                        <div class="bg-white p-2 rounded">
+                            <div class="text-sm">5-Year Tax Benefit</div>
+                            <div class="text-lg font-medium" id="sim-tax-benefit">$84,140</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 text-sm" id="sim-recommendation">
+                        <p>
+                            Based on current parameters, the saving strategy needs adjustment for your planned replacements. 
+                            Your shorter financing terms will help minimize interest costs.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <!-- Alert Thresholds -->
+            <div class="card">
+                <h2>Alert Thresholds</h2>
+                
+                <div class="grid grid-cols-2">
+                    <div class="form-group">
+                        <label for="settings-truck-age">Truck Age Alert (years)</label>
+                        <input type="number" id="settings-truck-age" value="7">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="settings-trailer-age">Trailer Age Alert (years)</label>
+                        <input type="number" id="settings-trailer-age" value="10">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="settings-mileage">Mileage Alert</label>
+                        <input type="number" id="settings-mileage" value="450000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="settings-repair-ratio">Repair-to-Value Ratio Alert (%)</label>
+                        <input type="number" id="settings-repair-ratio" value="30">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="settings-fuel">Fuel Efficiency Alert (MPG)</label>
+                        <input type="number" id="settings-fuel" value="6" step="0.1">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Financial Settings -->
+            <div class="card">
+                <h2>Financial Settings</h2>
+                
+                <div class="grid grid-cols-3">
+                    <div class="form-group">
+                        <label for="settings-loan-rate">Loan Interest Rate (%)</label>
+                        <input type="number" id="settings-loan-rate" value="6.5" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="settings-lease-rate">Lease Interest Rate (%)</label>
+                        <input type="number" id="settings-lease-rate" value="5.8" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="settings-depreciation">Depreciation Method</label>
+                        <select id="settings-depreciation">
+                            <option value="MACRS">MACRS</option>
+                            <option value="Straight Line">Straight Line</option>
+                            <option value="Section 179" selected>Section 179</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Export/Import -->
+            <div class="card">
+                <h2>Data Management</h2>
+                
+                <div class="flex flex-wrap" style="gap: 16px;">
+                    <button id="export-data-btn">Export Fleet Data</button>
+                    <button id="import-data-btn" style="background-color: #6b7280;">Import Fleet Data</button>
+                    <button id="generate-report-btn" style="background-color: #10b981;">Generate Fleet Report</button>
+                </div>
+                
+                <div class="mt-4 alert alert-warning">
+                    <h3>Integration Notes</h3>
+                    <p class="mt-1">
+                        In a production environment, this tool can be integrated with:
+                    </p>
+                    <ul class="list-disc" style="padding-left: 24px; margin-top: 8px;">
+                        <li>Maintenance systems (e.g., Fleetio, Geotab)</li>
+                        <li>Accounting software exports</li>
+                        <li>Notion databases via API</li>
+                        <li>Power BI for advanced reporting</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Default data
+        const defaultData = {
+            vehicles: [
+                { 
+                    id: 1, 
+                    name: 'Truck #117', 
+                    type: 'Straight',
+                    purchaseYear: 2010,
+                    currentMileage: 210000,
+                    purchaseCost: 55000,
+                    replacementCost: 68000,
+                    replacementQuarter: 'Q3',
+                    replacementYear: 2025,
+                    salvageValue: 0,
+                    maintenanceCost: 8500,
+                    fuelEff: 5.8,
+                    serviceInterval: 10000,
+                    inflationRate: 2.5 
+                },
+                { 
+                    id: 2, 
+                    name: 'T102', 
+                    type: 'Mini Trailer',
+                    purchaseYear: 1991,
+                    currentMileage: 0,
+                    purchaseCost: 85000,
+                    replacementCost: 210000,
+                    replacementQuarter: 'Q2',
+                    replacementYear: 2025,
+                    salvageValue: 45000,
+                    maintenanceCost: 12000,
+                    fuelEff: 0,
+                    serviceInterval: 15000,
+                    inflationRate: 2.5 
+                },
+                { 
+                    id: 3, 
+                    name: 'T105', 
+                    type: 'Full Trailer',
+                    purchaseYear: 2001,
+                    currentMileage: 0,
+                    purchaseCost: 45000,
+                    replacementCost: 85000,
+                    replacementQuarter: 'Q2',
+                    replacementYear: 2025,
+                    salvageValue: 17500,
+                    maintenanceCost: 7500,
+                    fuelEff: 0,
+                    serviceInterval: 15000,
+                    inflationRate: 2.5 
+                }
+            ],
+            settings: {
+                financial: {
+                    initialFund: 25000,
+                    monthlyContribution: 3000,
+                    interestRate: 1.5,
+                    taxRate: 28,
+                    depreciationMethod: 'Section 179',
+                    loanTermYears: 5,
+                    loanInterestRate: 6.5,
+                    leaseInterestRate: 5.8
+                },
+                alerts: {
+                    ageTruck: 7,
+                    ageTrailer: 10,
+                    mileage: 450000,
+                    repairToValueRatio: 30,
+                    fuelEfficiency: 6
+                }
+            }
+        };
+        
+        let appData = JSON.parse(JSON.stringify(defaultData));
+        
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Show corresponding content
+                const tabName = tab.getAttribute('data-tab');
+                document.getElementById(tabName).classList.add('active');
+                
+                // Update charts
+                if (tabName === 'dashboard') {
+                    updateDashboardCharts();
+                } else if (tabName === 'forecasting') {
+                    updateForecastingCharts();
+                }
+            });
+        });
+        
+        // Format currency
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+        
+        // Format number with commas
+        function formatNumber(value) {
+            return new Intl.NumberFormat('en-US').format(value);
+        }
+        
+        // Calculate age from purchase year
+        function calculateAge(purchaseYear) {
+            return 2025 - purchaseYear;
+        }
+        
+        // Generate alerts for vehicle
+        function generateAlerts(vehicle) {
+            const alerts = [];
+            const currentYear = 2025;
+            const settings = appData.settings.alerts;
+            
+            // Age alerts
+            const age = currentYear - vehicle.purchaseYear;
+            if (vehicle.type === 'Straight' && age > settings.ageTruck) {
+                alerts.push(`Age > ${settings.ageTruck} years`);
+            } else if ((vehicle.type === 'Mini Trailer' || vehicle.type === 'Full Trailer') && age > settings.ageTrailer) {
+                alerts.push(`Age > ${settings.ageTrailer} years`);
+            }
+            
+            // Mileage alerts
+            if (vehicle.currentMileage > settings.mileage) {
+                alerts.push(`Mileage > ${formatNumber(settings.mileage)} miles`);
+            }
+            
+            // Maintenance cost ratio
+            const maintenanceRatio = (vehicle.maintenanceCost / vehicle.purchaseCost) * 100;
+            if (maintenanceRatio > settings.repairToValueRatio) {
+                alerts.push(`Maintenance costs > ${settings.repairToValueRatio}% of value`);
+            }
+            
+            // Fuel efficiency
+            if (vehicle.fuelEff > 0 && vehicle.fuelEff < settings.fuelEfficiency) {
+                alerts.push(`Fuel efficiency < ${settings.fuelEfficiency} MPG`);
+            }
+            
+            return alerts;
+        }
+        
+        // Update Vehicles Table
+        function updateVehiclesTable() {
+            const tableBody = document.getElementById('vehicles-table');
+            tableBody.innerHTML = '';
+            
+            appData.vehicles.forEach(vehicle => {
+                const age = calculateAge(vehicle.purchaseYear);
+                const alerts = generateAlerts(vehicle);
+                
+                const row = document.createElement('tr');
+                row.className = alerts.length > 0 ? 'bg-red-50' : '';
+                
+                row.innerHTML = `
+                    <td>${vehicle.name}</td>
+                    <td>${vehicle.type}</td>
+                    <td>${age} years${vehicle.currentMileage > 0 ? ` / ${formatNumber(vehicle.currentMileage)} mi` : ''}</td>
+                    <td>${vehicle.replacementQuarter} ${vehicle.replacementYear}</td>
+                    <td>
+                        ${formatCurrency(vehicle.replacementCost)}
+                        ${vehicle.salvageValue > 0 ? `<div style="font-size: 0.75rem; color: var(--gray);">Net: ${formatCurrency(vehicle.replacementCost - vehicle.salvageValue)}</div>` : ''}
+                    </td>
+                    <td>
+                        ${alerts.length > 0 ? 
+                            `<span class="badge badge-danger">${alerts.length} ${alerts.length === 1 ? 'alert' : 'alerts'}</span>` : 
+                            `<span class="text-green">None</span>`
+                        }
+                    </td>
+                    <td>
+                        <button class="danger remove-vehicle" data-id="${vehicle.id}">Remove</button>
+                    </td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Add event listeners to remove buttons
+            document.querySelectorAll('.remove-vehicle').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = parseInt(e.target.getAttribute('data-id'));
+                    appData.vehicles = appData.vehicles.filter(v => v.id !== id);
+                    updateAll();
+                });
+            });
+        }
+        
+        // Calculate loan payment
+        function calculatePayment(principal, rate, periods) {
+            if (rate === 0) return principal / periods;
+            return principal * rate * Math.pow(1 + rate, periods) / (Math.pow(1 + rate, periods) - 1);
+        }
+        
+        // Calculate lease payment
+        function calculateLeasePayment(cost, residual, rate, years) {
+            const depreciation = (cost - residual) / (years * 12);
+            const interest = ((cost + residual) / 2) * (rate / 100 / 12);
+            return depreciation + interest;
+        }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fox Fuel Fleet Budget Forecaster</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gray: #6b7280;
+            --gray-light: #e5e7eb;
+            --gray-dark: #1f2937;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            line-height: 1.5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--gray-dark);
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--gray-dark);
+        }
+        
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--gray-dark);
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid var(--gray-light);
+            margin-bottom: 24px;
+        }
+        
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            margin-right: 8px;
+            font-weight: 500;
+            color: var(--gray);
+            transition: all 0.2s;
+        }
+        
+        .tab:hover {
+            color: var(--gray-dark);
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .grid {
+            display: grid;
+            grid-gap: 16px;
+        }
+        
+        .grid-cols-1 {
+            grid-template-columns: 1fr;
+        }
+        
+        .grid-cols-2 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .grid-cols-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        
+        @media (max-width: 768px) {
+            .grid-cols-2, .grid-cols-3 {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--gray);
+            margin-bottom: 4px;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--gray-light);
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            background: var(--gray-light);
+            border-radius: 5px;
+            outline: none;
+            padding: 0;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+        
+        .range-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--gray);
+            margin-top: 4px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+        
+        button.danger {
+            background-color: var(--danger);
+        }
+        
+        button.danger:hover {
+            background-color: #dc2626;
+        }
+        
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+        
+        .alert-info {
+            background-color: #eff6ff;
+            border: 1px solid #dbeafe;
+            color: #1e40af;
+        }
+        
+        .alert-success {
+            background-color: #ecfdf5;
+            border: 1px solid #d1fae5;
+            color: #047857;
+        }
+        
+        .alert-warning {
+            background-color: #fffbeb;
+            border: 1px solid #fef3c7;
+            color: #92400e;
+        }
+        
+        .alert-danger {
+            background-color: #fef2f2;
+            border: 1px solid #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .mt-4 {
+            margin-top: 16px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-light);
+        }
+        
+        th {
+            font-weight: 500;
+            color: var(--gray);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+        
+        tbody tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .badge-danger {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .badge-success {
+            background-color: #d1fae5;
+            color: #047857;
+        }
+        
+        .badge-warning {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-bottom: 16px;
+        }
+        
+        .flex {
+            display: flex;
+        }
+        
+        .justify-between {
+            justify-content: space-between;
+        }
+        
+        .items-center {
+            align-items: center;
+        }
+        
+        .text-sm {
+            font-size: 0.875rem;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            background-color: var(--gray-light);
+            border-radius: 9999px;
+            height: 8px;
+            margin-right: 8px;
+        }
+        
+        .progress-value {
+            height: 100%;
+            border-radius: 9999px;
+        }
+        
+        .text-red {
+            color: var(--danger);
+        }
+        
+        .text-green {
+            color: var(--success);
+        }
+        
+        .font-medium {
+            font-weight: 500;
+        }
+        
+        .bg-red-50 {
+            background-color: #fef2f2;
+        }
+        
+        .p-2 {
+            padding: 8px;
+        }
+        
+        .rounded {
+            border-radius: 4px;
+        }
+        
+        .space-y-4 > * + * {
+            margin-top: 16px;
+        }
+        
+        .list-disc {
+            list-style-type: disc;
+            padding-left: 24px;
+        }
+
+        .scenario-summary {
+            display: none;
+        }
+        
+        .scenario-summary.active {
+            display: block;
+        }
+
+        .scenario-row.active {
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fox Fuel Fleet Equipment Budget Forecaster</h1>
+        
+        <div class="tab-container">
+            <div class="tab active" data-tab="dashboard">Dashboard</div>
+            <div class="tab" data-tab="vehicles">Fleet Inventory</div>
+            <div class="tab" data-tab="forecasting">Budget Forecasting</div>
+            <div class="tab" data-tab="scenarios">Scenario Planning</div>
+            <div class="tab" data-tab="settings">Settings</div>
+        </div>
+        
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="grid grid-cols-3">
+                <!-- Summary Stats -->
+                <div class="card">
+                    <h2>Fleet Summary</h2>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span>Total Vehicles:</span>
+                            <span class="font-medium" id="total-vehicles">3</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Planned Replacements (12mo):</span>
+                            <span class="font-medium" id="planned-replacements">3</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Total Replacement Budget:</span>
+                            <span class="font-medium" id="total-budget">$300,500</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Average Vehicle Age:</span>
+                            <span class="font-medium" id="avg-age">15.7 years</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Alert Summary -->
+                <div class="card">
+                    <h2>Fleet Alerts</h2>
+                    <div id="fleet-alerts">
+                        <div class="bg-red-50 p-2 rounded">
+                            <div class="font-medium text-red">Truck #117</div>
+                            <ul class="text-sm">
+                                <li>• Age > 7 years</li>
+                                <li>• Maintenance costs high</li>
+                            </ul>
+                        </div>
+                        <div class="mt-4 bg-red-50 p-2 rounded">
+                            <div class="font-medium text-red">T102</div>
+                            <ul class="text-sm">
+                                <li>• Age > 10 years</li>
+                            </ul>
+                        </div>
+                        <div class="mt-4 bg-red-50 p-2 rounded">
+                            <div class="font-medium text-red">T105</div>
+                            <ul class="text-sm">
+                                <li>• Age > 10 years</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Next Replacements -->
+                <div class="card">
+                    <h2>Next Replacements</h2>
+                    <div id="next-replacements">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-medium">Truck #117</div>
+                                <div class="text-sm">Q3 2025</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-medium">$68,000</div>
+                                <div class="text-sm">Net Cost</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-between items-center">
+                            <div>
+                                <div class="font-medium">T102</div>
+                                <div class="text-sm">Q2 2025</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-medium">$165,000</div>
+                                <div class="text-sm">Net Cost</div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-between items-center">
+                            <div>
+                                <div class="font-medium">T105</div>
+                                <div class="text-sm">Q2 2025</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-medium">$67,500</div>
+                                <div class="text-sm">Net Cost</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts Row -->
+            <div class="grid grid-cols-2 mt-4">
+                <!-- Capital Expenditure Forecast -->
+                <div class="card">
+                    <h2>Capital Expenditure Forecast</h2>
+                    <div class="chart-container">
+                        <canvas id="capex-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Fleet Age Distribution -->
+                <div class="card">
+                    <h2>Fleet Age Distribution</h2>
+                    <div class="chart-container">
+                        <canvas id="age-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Items -->
+            <div class="card mt-4">
+                <h2>Recommended Actions</h2>
+                
+                <div class="space-y-4">
+                    <!-- High priority actions -->
+                    <div class="alert alert-danger">
+                        <h3>Critical (Next 90 Days)</h3>
+                        <ul class="list-disc">
+                            <li>Replace Truck #117 (Straight) - budgeted $68,000</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Medium priority actions -->
+                    <div class="alert alert-warning">
+                        <h3>Important (Next 6 Months)</h3>
+                        <ul class="list-disc">
+                            <li>Schedule replacement of T102 - monthly reserve: $13,750</li>
+                            <li>Schedule replacement of T105 - monthly reserve: $5,625</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Financial planning actions -->
+                    <div class="alert alert-info">
+                        <h3>Financial Planning</h3>
+                        <ul class="list-disc">
+                            <li>Set aside $3,000 monthly for equipment fund</li>
+                            <li>Maintain current replacement schedule for optimal ROI</li>
+                            <li>Evaluate leasing options to reduce operational risk</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Vehicles Tab -->
+        <div id="vehicles" class="tab-content">
+            <!-- Vehicles List -->
+            <div class="card">
+                <div class="flex justify-between items-center">
+                    <h2>Vehicle Lifecycle Management</h2>
+                    <button id="add-vehicle-btn">Add Vehicle</button>
+                </div>
+                
+                <!-- Vehicle Table -->
+                <div class="mt-4" style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vehicle</th>
+                                <th>Type</th>
+                                <th>Age/Miles</th>
+                                <th>Replacement</th>
+                                <th>Cost</th>
+                                <th>Alerts</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vehicles-table">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Add New Vehicle Form -->
+            <div id="add-vehicle-form" class="card">
+                <h2>Add New Vehicle</h2>
+                
+                <div class="grid grid-cols-3">
+                    <div class="form-group">
+                        <label for="vehicle-name">Vehicle Name/ID</label>
+                        <input type="text" id="vehicle-name" placeholder="e.g. Truck #120">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="vehicle-type">Vehicle Type</label>
+                        <select id="vehicle-type">
+                            <option value="Straight">Straight Truck</option>
+                            <option value="Mini Trailer">Mini Trailer</option>
+                            <option value="Full Trailer">Full Trailer</option>
+                            <option value="Service">Service Vehicle</option>
+                            <option value="Admin">Administrative Vehicle</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="purchase-year">Purchase Year</label>
+                        <input type="number" id="purchase-year" value="2020">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="current-mileage">Current Mileage</label>
+                        <input type="number" id="current-mileage" value="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="purchase-cost">Original Purchase Cost ($)</label>
+                        <input type="number" id="purchase-cost" value="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="maintenance-cost">Annual Maintenance Cost ($)</label>
+                        <input type="number" id="maintenance-cost" value="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fuel-eff">Fuel Efficiency (MPG, 0 if N/A)</label>
+                        <input type="number" id="fuel-eff" value="7" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="service-interval">Service Interval (miles)</label>
+                        <input type="number" id="service-interval" value="10000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="replacement-cost">Replacement Cost ($)</label>
+                        <input type="number" id="replacement-cost" value="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="salvage-value">Expected Salvage Value ($)</label>
+                        <input type="number" id="salvage-value" value="0">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="replacement-year">Replacement Year</label>
+                        <input type="number" id="replacement-year" value="2025">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="replacement-quarter">Replacement Quarter</label>
+                        <select id="replacement-quarter">
+                            <option value="Q1">Q1</option>
+                            <option value="Q2">Q2</option>
+                            <option value="Q3">Q3</option>
+                            <option value="Q4">Q4</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="inflation-rate">Annual Inflation Rate (%)</label>
+                        <input type="number" id="inflation-rate" value="2.5" step="0.1">
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button id="save-vehicle-btn">Add Vehicle</button>
+                </div>
+            </div>
+            
+            <!-- Vehicle Lifecycle Guide -->
+            <div class="card">
+                <h2>Vehicle Lifecycle Guidelines</h2>
+                
+                <div class="grid grid-cols-2">
+                    <div class="alert alert-info">
+                        <h3>Trucks</h3>
+                        <ul class="list-disc">
+                            <li>Recommended replacement age: <span id="truck-age-threshold">7</span> years</li>
+                            <li>Recommended replacement mileage: <span id="mileage-threshold">450,000</span> miles</li>
+                            <li>Replace when maintenance costs exceed <span id="repair-value-threshold">30</span>% of value</li>
+                            <li>Replace when fuel efficiency drops below <span id="fuel-threshold">6</span> MPG</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-success">
+                        <h3>Trailers</h3>
+                        <ul class="list-disc">
+                            <li>Recommended replacement age: <span id="trailer-age-threshold">10</span> years</li>
+                            <li>Replace when maintenance costs exceed <span id="trailer-repair-threshold">30</span>% of value</li>
+                            <li>Consider upgrading mini trailers to tri-axle for efficiency</li>
+                            <li>Evaluate tank condition separately from chassis</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Budget Forecasting Tab -->
+        <div id="forecasting" class="tab-content">
+            <!-- Fund Settings -->
+            <div class="card">
+                <h2>Equipment Fund Settings</h2>
+                
+                <div class="grid grid-cols-3">
+                    <div class="form-group">
+                        <label for="initial-fund">Initial Fund Balance ($)</label>
+                        <input type="number" id="initial-fund" value="25000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="monthly-contribution">Monthly Contribution ($)</label>
+                        <input type="number" id="monthly-contribution" value="3000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="interest-rate">Annual Interest Rate (%)</label>
+                        <input type="number" id="interest-rate" value="1.5" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="tax-rate">Effective Tax Rate (%)</label>
+                        <input type="number" id="tax-rate" value="28">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="depreciation-method">Depreciation Method</label>
+                        <select id="depreciation-method">
+                            <option value="MACRS">MACRS</option>
+                            <option value="Straight Line">Straight Line</option>
+                            <option value="Section 179">Section 179</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="loan-term">Loan Term (Years)</label>
+                        <input type="number" id="loan-term" value="5">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Fund Projection Chart -->
+            <div class="card">
+                <h2>Fund Projection</h2>
+                <div class="chart-container">
+                    <canvas id="fund-chart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Replacement Details -->
+            <div class="card">
+                <h2>Replacement Details</h2>
+                
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vehicle</th>
+                                <th>When</th>
+                                <th>Net Cost</th>
+                                <th>Monthly Reserve</th>
+                                <th>Monthly Loan</th>
+                                <th>Monthly Lease</th>
+                                <th>Fund Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="projections-table">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Tax Benefits -->
+            <div class="card">
+                <h2>Tax Benefits Analysis</h2>
+                
+                <div class="grid grid-cols-3">
+                    <!-- Section 179 -->
+                    <div class="alert alert-success">
+                        <h3>Section 179 Deduction</h3>
+                        <div>
+                            <div class="flex justify-between">
+                                <span>Equipment Purchases (Year 1):</span>
+                                <span class="font-medium" id="section179-purchases">$300,500</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Potential Tax Deduction:</span>
+                                <span class="font-medium" id="section179-deduction">$300,500</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Tax Savings (at <span id="tax-rate-display">28</span>%):</span>
+                                <span class="font-medium" id="section179-savings">$84,140</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Straight Line -->
+                    <div class="alert alert-info">
+                        <h3>Straight Line Depreciation</h3>
+                        <div>
+                            <div class="flex justify-between">
+                                <span>Annual Depreciation:</span>
+                                <span class="font-medium" id="annual-depreciation">$60,100</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Annual Tax Savings:</span>
+                                <span class="font-medium" id="annual-tax-savings">$16,828</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>5-Year Tax Savings:</span>
+                                <span class="font-medium" id="five-year-savings">$84,140</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comparison -->
+                    <div class="alert alert-warning">
+                        <h3>Cash Flow Impact</h3>
+                        <div>
+                            <div class="flex justify-between">
+                                <span>Section 179 First Year Savings:</span>
+                                <span class="font-medium" id="sec179-first-year">$84,140</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Straight Line First Year Savings:</span>
+                                <span class="font-medium" id="sl-first-year">$16,828</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>First Year Cash Advantage (179):</span>
+                                <span class="font-medium" id="first-year-advantage">$67,312</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scenario Planning Tab -->
+        <div id="scenarios" class="tab-content">
+            <!-- Scenario comparison -->
+            <div class="card">
+                <h2>Scenario Comparison</h2>
+                
+                <!-- Scenario buttons -->
+                <div class="flex">
+                    <button class="scenario-btn active" data-scenario="current">Current Plan</button>
+                    <button class="scenario-btn" data-scenario="delay" style="margin-left: 8px;">Delay 1 Year</button>
+                    <button class="scenario-btn" data-scenario="lease" style="margin-left: 8px;">Lease Options</button>
+                </div>
+                
+                <!-- Comparison table -->
+                <div class="mt-4" style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Scenario</th>
+                                <th>Total Cash Needed</th>
+                                <th>ROI</th>
+                                <th>Risk Level</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="scenario-row active" data-scenario="current">
+                                <td>Current Plan</td>
+                                <td>$300,500</td>
+                                <td>15.4%</td>
+                                <td>
+                                    <div class="flex items-center">
+                                        <div class="progress-bar">
+                                            <div class="progress-value" style="width: 58%; background-color: #f59e0b;"></div>
+                                        </div>
+                                        <span>58</span>
+                                    </div>
+                                </td>
+                                <td><span class="text-green">Selected</span></td>
+                            </tr>
+                            <tr class="scenario-row" data-scenario="delay">
+                                <td>Delay 1 Year</td>
+                                <td>$308,000</td>
+                                <td>12.1%</t

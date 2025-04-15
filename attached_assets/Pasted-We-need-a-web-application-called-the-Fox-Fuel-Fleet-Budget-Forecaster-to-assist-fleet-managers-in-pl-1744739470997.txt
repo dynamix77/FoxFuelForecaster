@@ -1,0 +1,92 @@
+We need a web application called the Fox Fuel Fleet Budget Forecaster to assist fleet managers in planning vehicle replacements, forecasting budgets, and evaluating financial scenarios. The app should provide an intuitive, interactive interface for managing a vehicle fleet, visualizing financial projections, and comparing strategic options, built using HTML, CSS, and JavaScript.
+
+Purpose
+The application should help fleet managers:
+
+Track vehicle details (e.g., age, mileage, replacement costs) and manage inventory.
+Forecast replacement costs over a 10-year period, factoring in inflation, funding, and financing options (loans or leases).
+Visualize budget trends and fleet status through charts and tables.
+Compare scenarios (e.g., replacing vehicles on schedule, delaying replacements, or leasing) to optimize financial planning.
+Key Functionalities
+Financial Projections:
+Allow users to input an initial fund balance, monthly contributions, and an annual interest rate (compounded monthly).
+Calculate replacement costs for vehicles, adjusting for user-defined inflation rates.
+Deduct net costs (replacement cost minus salvage value) from the fund when replacements occur.
+Estimate monthly savings needed for each replacement, as well as monthly loan or lease payments.
+Identify funding shortfalls if the fund is insufficient and track fund balances quarterly.
+User Interface:
+Tabbed Navigation: Include five tabs:
+Dashboard: Summarize fleet stats (e.g., total vehicles, average age, total budget), show alerts for vehicles needing attention (e.g., old age, high mileage), list upcoming replacements, and display charts.
+Vehicles: List all vehicles in a table (columns: name, type, age/mileage, replacement date, cost, alerts, actions) with options to add or remove vehicles.
+Budget Forecasting: Show a table of replacement projections (e.g., vehicle, date, net cost, monthly reserve, loan/lease payments, fund status) and a chart of fund growth over time. Include tax benefits analysis comparing methods like immediate deductions vs. spread-out depreciation.
+Scenario Planning: Compare three scenarios (current replacement schedule, delaying all replacements by one year, leasing instead of buying) in a table showing total cash needed, return on investment (ROI), and risk level (with progress bars). Add a simulator with sliders to adjust variables like contribution amount, interest rate, or inflation.
+Settings: Allow users to configure financial settings (e.g., loan/lease interest rates, tax rate, depreciation method) and alert thresholds (e.g., maximum vehicle age, mileage).
+Highlight funding shortfalls in red and fully funded replacements in green.
+Use color-coded alerts for vehicles exceeding thresholds (e.g., red for critical issues).
+Vehicle Management:
+Store vehicle details, including name, type (e.g., truck, trailer), purchase year, current mileage, replacement cost, salvage value, inflation rate, and replacement date (year and quarter: Q1-Q4).
+Provide a form to add new vehicles with fields for all relevant details.
+Allow removal of vehicles from the inventory.
+Generate alerts when vehicles exceed user-defined thresholds (e.g., trucks older than 7 years, mileage over 450,000, or high maintenance costs).
+Data Visualizations:
+Create interactive charts using a library like Chart.js:
+Capital Expenditure Forecast: Show planned replacement costs over time (e.g., by quarter or year).
+Fleet Age Distribution: Display the number of vehicles by age range (e.g., 0-5 years, 6-10 years).
+Fund Projection: Graph the equipment fund balance over 10 years, showing contributions, interest, and deductions for replacements.
+Use progress bars to visualize risk levels in scenario comparisons (e.g., 58/100 for moderate risk).
+Interactivity:
+Update tables, charts, and alerts dynamically when users add/remove vehicles, change settings, or adjust simulator sliders.
+Format monetary values as currency (e.g., $68,000) and large numbers with commas (e.g., 450,000 miles).
+Enable scenario selection with toggling descriptions and financial impacts (e.g., cash flow, tax savings).
+Ensure the interface is intuitive, with clear labels and responsive design for desktop and mobile.
+Technical Requirements
+Front-End:
+Use HTML for a clean, semantic structure with tabs, tables, forms, and chart containers.
+Use CSS for styling, ensuring a modern, professional look with:
+Responsive design (works on desktop and mobile).
+Consistent color scheme (e.g., blue for primary actions, red for alerts, green for success).
+Custom styles for tables, buttons, alerts, progress bars, and sliders.
+Optional: Use a utility-based approach (like Tailwind) or plain CSS with variables for colors.
+Include Font Awesome for icons (e.g., for buttons or alerts).
+JavaScript:
+Manage data in a JavaScript object storing vehicles and settings, with defaults for testing (e.g., 3 vehicles, $25,000 initial fund).
+Implement logic for:
+Calculating fund growth with compound interest.
+Adjusting costs for inflation (e.g., using the formula cost * (1 + inflationRate/100)^years).
+Computing loan payments (e.g., standard amortization formula) and lease payments (e.g., based on depreciation and interest).
+Generating alerts based on user-defined thresholds.
+Updating the DOM for tables, charts, and scenario toggles.
+Use Chart.js for all charts, ensuring they are clear and interactive (e.g., tooltips, legends).
+External Libraries:
+Chart.js (latest stable version) for charts.
+Font Awesome (latest stable version) for icons.
+Performance:
+Optimize for handling up to 50 vehicles without lag in calculations or rendering.
+Ensure accurate financial calculations (e.g., round currency to nearest dollar).
+Minimize external dependencies beyond Chart.js and Font Awesome.
+Example Workflow
+User Input:
+Add a vehicle: "Truck #120", type: Straight Truck, purchased 2015, replacement Q3 2026, cost $70,000, salvage $5,000, inflation 2.5%.
+Set fund: $25,000 initial, $3,000/month contribution, 1.5% interest.
+Configure alerts: Flag trucks older than 7 years or with mileage > 450,000.
+Output:
+Dashboard shows 4 vehicles, average age 12 years, $350,000 total budget.
+Alerts highlight Truck #120 as over 7 years old.
+Projections table shows Truck #120 needs ~$65,000 net cost, $2,708/month reserve, or $1,300/month loan.
+Scenario table compares current plan ($350,000 cash, 15% ROI) vs. leasing (lower upfront cost, 12% ROI).
+Charts display spikes in 2026 for replacements and fund dips after purchases.
+Deliverables
+A complete web application with HTML, CSS, and JavaScript files.
+A README or documentation explaining:
+How to run the app locally (e.g., serve via a static server).
+The data structure for vehicles and settings.
+Any assumptions made in calculations.
+A demo with sample data (e.g., 3-5 vehicles, realistic financial settings) showcasing all features.
+Notes
+Prioritize usability: Clear labels, intuitive navigation, and visual feedback (e.g., red for shortfalls, green for funded).
+Ensure accuracy: Use standard financial formulas for loans, leases, and inflation adjustments.
+Design for extensibility: Structure the code to allow future integrations (e.g., APIs for accounting or maintenance systems).
+Include defaults: Pre-populate with sample data like:
+Vehicles: A truck (replace 2025, $68,000), two trailers (replace 2025, $85,000 and $210,000).
+Settings: $25,000 initial fund, $3,000/month, 1.5% interest, 6.5% loan rate, 28% tax rate.
+Please deliver the application by [insert deadline], and feel free to reach out with any questions or for clarification on requirements!
