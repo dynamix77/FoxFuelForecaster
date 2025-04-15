@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '@/lib/context';
 import { Vehicle } from '@/lib/types';
+import { VehicleDetail } from './VehicleDetail';
+import { Button } from '@/components/ui/button';
+import { Eye, Edit, Trash } from 'lucide-react';
 
 interface VehicleTableProps {
   onEditVehicle: (vehicle: Vehicle) => void;
@@ -8,6 +11,7 @@ interface VehicleTableProps {
 
 const VehicleTable: React.FC<VehicleTableProps> = ({ onEditVehicle }) => {
   const { vehicles, alerts, removeVehicle } = useAppContext();
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   
   // Get current year for age calculation
   const currentYear = new Date().getFullYear();
@@ -55,6 +59,11 @@ const VehicleTable: React.FC<VehicleTableProps> = ({ onEditVehicle }) => {
     return { label: 'Good', className: 'bg-green-100 text-green-800' };
   };
   
+  // Handle view vehicle details
+  const handleViewDetails = (vehicle: Vehicle) => {
+    setSelectedVehicle(vehicle);
+  };
+  
   // Handle remove vehicle click
   const handleRemoveClick = (vehicleId: number, vehicleName: string) => {
     if (window.confirm(`Are you sure you want to remove ${vehicleName} from the fleet?`)) {
@@ -71,64 +80,99 @@ const VehicleTable: React.FC<VehicleTableProps> = ({ onEditVehicle }) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Year Purchased</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Current Age</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Current Mileage</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Replacement</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {vehicles.map((vehicle) => {
-              const vehicleAge = currentYear - vehicle.purchaseYear;
-              const status = getVehicleStatus(vehicle.id);
-              
-              return (
-                <tr key={vehicle.id}>
-                  <td className="py-2 px-4 text-sm text-gray-800">{vehicle.name}</td>
-                  <td className="py-2 px-4 text-sm text-gray-600">{vehicle.type}</td>
-                  <td className="py-2 px-4 text-sm text-gray-600">{vehicle.purchaseYear}</td>
-                  <td className="py-2 px-4 text-sm text-gray-600">{vehicleAge} years</td>
-                  <td className="py-2 px-4 text-sm text-gray-600">
-                    {vehicle.currentMileage !== null ? formatNumber(vehicle.currentMileage) : 'N/A'}
-                  </td>
-                  <td className="py-2 px-4 text-sm text-gray-600">{vehicle.replacementQuarter} {vehicle.replacementYear}</td>
-                  <td className="py-2 px-4 text-sm text-gray-600">{formatCurrency(vehicle.replacementCost)}</td>
-                  <td className="py-2 px-4 text-sm">
-                    <span className={`px-2 py-1 ${status.className} rounded-full text-xs`}>
-                      {status.label}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4 text-sm">
-                    <button 
-                      className="text-blue-600 hover:text-blue-800 mr-2"
-                      onClick={() => onEditVehicle(vehicle)}
-                    >
-                      <i className="fas fa-edit"></i>
-                    </button>
-                    <button 
-                      className="text-red-600 hover:text-red-800"
-                      onClick={() => handleRemoveClick(vehicle.id, vehicle.name)}
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    <>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Year Purchased</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Current Age</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Current Mileage</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Replacement</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {vehicles.map((vehicle) => {
+                const vehicleAge = currentYear - vehicle.purchaseYear;
+                const status = getVehicleStatus(vehicle.id);
+                
+                return (
+                  <tr 
+                    key={vehicle.id} 
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleViewDetails(vehicle)}
+                  >
+                    <td className="py-2 px-4 text-sm font-medium text-gray-800">{vehicle.name}</td>
+                    <td className="py-2 px-4 text-sm text-gray-600 capitalize">{vehicle.type}</td>
+                    <td className="py-2 px-4 text-sm text-gray-600">{vehicle.purchaseYear}</td>
+                    <td className="py-2 px-4 text-sm text-gray-600">{vehicleAge} years</td>
+                    <td className="py-2 px-4 text-sm text-gray-600">
+                      {vehicle.currentMileage !== null ? formatNumber(vehicle.currentMileage) : 'N/A'}
+                    </td>
+                    <td className="py-2 px-4 text-sm text-gray-600">{vehicle.replacementQuarter} {vehicle.replacementYear}</td>
+                    <td className="py-2 px-4 text-sm text-gray-600">{formatCurrency(vehicle.replacementCost)}</td>
+                    <td className="py-2 px-4 text-sm">
+                      <span className={`px-2 py-1 ${status.className} rounded-full text-xs`}>
+                        {status.label}
+                      </span>
+                    </td>
+                    <td className="py-2 px-4 text-sm">
+                      <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetails(vehicle);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditVehicle(vehicle);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveClick(vehicle.id, vehicle.name);
+                          }}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+      
+      {/* Vehicle Detail Dialog */}
+      {selectedVehicle && (
+        <VehicleDetail
+          vehicle={selectedVehicle}
+          isOpen={selectedVehicle !== null}
+          onClose={() => setSelectedVehicle(null)}
+        />
+      )}
+    </>
   );
 };
 
